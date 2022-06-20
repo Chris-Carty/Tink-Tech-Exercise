@@ -103,6 +103,8 @@ const fetchNextPage = async (accessToken, nextPageToken) => {
     }
 }
 
+/*----- STEP FIVE: EXTRACT & OUTPUT TRANSACTION DATA -----*/
+
 const extractData = transactions => {
 
     // Loop through each object in the transactions array and extract the necessary data
@@ -117,7 +119,7 @@ const extractData = transactions => {
      
         // Use the unscaled value & scale to calculate the amount in a human friendly format
         const val = unscaledValue * Math.pow(10, scale)
-        const amount = Math.round(amount * 100) / 100
+        const amount = Math.round(val * 100) / 100
      
         // Create a transaction object for each transaction
         const transaction = {
@@ -152,7 +154,7 @@ const subtractMonths = (numOfMonths, date = new Date()) => {
 }
 
 
-/*----- BONUS: ANALYZE TRANSACTION DATA -----*/
+/*----- STEP 6: BONUS TASK - ANALYZE TRANSACTION DATA -----*/
 
 const bonusTask = transactions_data => {
 
