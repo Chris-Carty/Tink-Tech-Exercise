@@ -20,7 +20,7 @@ app.listen(PORT, () => console.log(`server running on PORT ${PORT}`))
 // localhost:3000 redirects to my Tink Link URL.
 // User can authenticate the connection to the Tink Demo Bank 
 app.get('/', function (req, res) {
-    res.redirect('https://link.tink.com/1.0/transactions/connect-accounts/?client_id=c1b813fe0e7a470599c45b0856a9a48c&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&market=GB&locale=en_US&test=true');
+    res.redirect('https://link.tink.com/1.0/transactions/connect-accounts/?client_id='+ CLIENT_ID + '&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fcallback&market=GB&locale=en_US&test=true');
  })
 
 /*----- STEP TWO: HANDLE THE CALLBACK -----*/
