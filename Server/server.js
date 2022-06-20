@@ -6,6 +6,9 @@ import axios from 'axios'
 const CLIENT_ID = process.env.TINK_CLIENT_ID;
 const CLIENT_SECRET = process.env.TINK_CLIENT_SECRET;
 
+// Initialise Transaction data array
+let transactions_data = []
+
 const app = express()
 
 const PORT = process.env.PORT || 3000
@@ -55,58 +58,130 @@ const getAccessToken = async code => {
             }
         }
     )
-    
-    fetchTransactions(response.data.access_token)
 
+    fetchTransactions(response.data.access_token)
 }
 
 /*----- STEP FOUR: FETCH TRANSACTION DATA -----*/
 
-// Use access_token to fetch transaction data
+// Use access_token to fetch first page of transaction data
 const fetchTransactions = async accessToken => {
 
     // Axios post request to /transactions endpoint
-    const response = await axios.get('https://api.tink.com/data/v2/transactions?pageSize=10', {
+    const response = await axios.get('https://api.tink.com/data/v2/transactions?pageSize=100', {
         headers: {
             'Authorization': 'Bearer ' + accessToken 
         }
     });
 
-
     // Tink API response provides transactions as an array of objects
-    // Loop through each transaction object and extract the necessary data
-    // Have set this up to only capture 10 most recent transactions
-    let i = 0
+    // Pass this array to extractData function to get the required information
+    extractData(response.data.transactions)
 
-    while (i <= 9) {
-
-        // Store required transaction information in variables
-        const date = response.data.transactions[i].dates.booked
-        const description = response.data.transactions[i].descriptions.original
-        const unscaledValue = parseInt(response.data.transactions[i].amount.value.unscaledValue)
-        const scale= parseInt(response.data.transactions[i].amount.value.scale) * -1
-        const currency = response.data.transactions[i].amount.currencyCode
-
-        // Use the unscaled value & scale to calculate the amount in a human friendly format
-        const amount = unscaledValue * Math.pow(10, scale)
-
-        // Pass the transaction information to outputData function
-        outputData(date, description, amount, currency)
-
-        // Increment counter
-        i += 1
-    }
+    // Call fetchNextPage function to get more results, pass nextPageToken from the repsonse.
+    fetchNextPage(accessToken, response.data.nextPageToken)
 
 }
 
+const fetchNextPage = async (accessToken, nextPageToken) => {
+        
+    // Axios post request to /transactions endpoint
+    const response = await axios.get('https://api.tink.com/data/v2/transactions?pageSize=100&pageToken=' + nextPageToken, {
+        headers: {
+            'Authorization': 'Bearer ' + accessToken 
+        }
+    })
 
-const outputData = (date, description, amount, currency) => {
-    // Transactions fetched are presented in the following format:
-    // date (YYYY/MM/DD) - transaction description - amount - currency
-    const positive_int = amount * -1
+    // Tink API response provides transactions as an array of objects
+    // Pass this array to extractData function to get the required information
+    extractData(response.data.transactions)
 
-    console.log(date + ' - ' + description + ' - ' +  positive_int + ' - ' + currency)
+    if (transactions_data.length == 500) {
+        bonusTask(transactions_data)
+    } else {
+        fetchNextPage(accessToken, response.data.nextPageToken)
+    }
+}
+
+const extractData = transactions => {
+
+    // Loop through each object in the transactions array and extract the necessary data
+    for (let i = 0; i < transactions.length; i++) { 
+
+        // Store required transaction information in variables
+        const date = transactions[i].dates.booked
+        const description = transactions[i].descriptions.original
+        const unscaledValue = parseInt(transactions[i].amount.value.unscaledValue)
+        const scale= parseInt(transactions[i].amount.value.scale) * -1
+        const currency = transactions[i].amount.currencyCode
+     
+        // Use the unscaled value & scale to calculate the amount in a human friendly format
+        const val = unscaledValue * Math.pow(10, scale)
+        const amount = Math.round(amount * 100) / 100
+     
+        // Create a transaction object for each transaction
+        const transaction = {
+            date: date,
+            description: description,
+            amount: amount,
+            currency: currency
+        }
+     
+        // Add each transaction object to the transactions_data array
+        transactions_data.push(transaction)
+        
+    }
+   
+    if (transactions_data.length == 500) {
+        console.log(transactions_data)
+    }
+}
+
+// subtractMonths takes todays date and subtracts 3 months & 1 day
+// then formats the date to match the dataset (YYYY-MM-DD). 
+const subtractMonths = (numOfMonths, date = new Date()) => {
+
+    let d = date
+    d.setDate(d.getDate() - 1)
+    d.setMonth(d.getMonth() - numOfMonths)
+
+    // Format date to YYYY-MM-DD (Same as dataset)
+    const date_formatted = d.toISOString().split('T')[0]
+
+    return date_formatted;
 }
 
 
 /*----- BONUS: ANALYZE TRANSACTION DATA -----*/
+
+const bonusTask = transactions_data => {
+
+    // Find the index of date minus 3 months
+    const index = transactions_data.findIndex(object => {
+        return object.date === subtractMonths(3);
+    });
+
+    // Remove transactions from the array older than 3 months
+    transactions_data.splice(index, transactions_data.length); 
+
+    // Create an object for each unique transaction description
+    // & Count frequency with which each description occurs in the dataset
+    // Store these description objects in an array
+    // E.G unique_descriptions = [{description: xxx, count: 10},{description: yyy, count: 9}]
+    const grouped = transactions_data.reduce((groups, cur) => {
+        const key = cur.description;
+    
+        groups[key] = (groups[key] || 0) + 1;
+    
+        return groups;
+    }, {});
+    
+    const unique_descriptions = Object.keys(grouped).map(key => ({description: key, count: grouped[key]}));
+
+    // Sort - most frequent descriptions will occur first in the array
+    unique_descriptions.sort((a, b) => b.count - a.count)
+    
+    console.log(unique_descriptions);
+
+}
+
